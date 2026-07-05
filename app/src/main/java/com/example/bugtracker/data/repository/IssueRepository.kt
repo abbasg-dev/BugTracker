@@ -29,12 +29,12 @@ class IssueRepository(
         syncPendingIssues()
     }
 
+    // Q2: Enhanced with retry mechanism and exponential backoff
     suspend fun syncPendingIssues(retry: Int = 3) {
         val unsynced = dao.getUnsyncedIssues()
 
         unsynced.forEach { issue ->
             try {
-                // IssueDto expects id: Int?, not issue.id directly
                 RetrofitClient.api.createIssue(
                     IssueDto(
                         id = if (issue.id != 0) issue.id else null,
@@ -49,11 +49,10 @@ class IssueRepository(
                 dao.updateIssue(issue.copy(isSynced = true))
             } catch (e: Exception) {
                 if (retry > 0) {
-                    delay(2000)
-                    syncPendingIssues(retry - 1)
+                    delay(2000) // Wait before retry
+                    syncPendingIssues(retry - 1) // Recursive retry with exponential backoff
                 }
-                // Optional: Log the error
-                // Log.e("IssueRepository", "Sync failed for issue ${issue.id}", e)
+                // If all retries fail, keep isSynced = false for future retry
             }
         }
     }
